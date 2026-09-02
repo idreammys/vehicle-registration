@@ -182,7 +182,7 @@
                         <label class="block text-xs font-medium text-gray-700 mb-1">สถานะดำเนินการ</label>
                         <select id="operation_status" class="w-full border rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-400">
                             <option value="กำลังดำเนินการ">กำลังดำเนินการ</option>
-                            <option value="เสร็จแล้ว">เสร็จแล้ว</option>
+                            <option value="งานเสร็จ">งานเสร็จ</option>
                         </select>
                     </div>
                     <div>
@@ -626,7 +626,7 @@
 
             if (currentMonth !== 'all') {
                 filtered = filtered.filter(r => 
-                    (r.status?.operation !== 'เสร็จแล้ว') || 
+                    (!r.status?.operation || !r.status.operation.includes('เสร็จ')) || 
                     (r.completed_date && r.completed_date.startsWith(currentMonth))
                 );
             }
@@ -651,7 +651,8 @@
         function updateDashboard(records) {
             let totalCollected = 0, totalProfit = 0, pendingPlateCount = 0, pendingAccCount = 0;
             records.forEach(data => {
-                const isCompletedInMonth = data.status?.operation === 'เสร็จแล้ว' && (currentMonth === 'all' || (data.completed_date && data.completed_date.startsWith(currentMonth)));
+                const isCompleted = data.status?.operation && data.status.operation.includes('เสร็จ');
+                const isCompletedInMonth = isCompleted && (currentMonth === 'all' || (data.completed_date && data.completed_date.startsWith(currentMonth)));
                 if (isCompletedInMonth) {
                     totalCollected += data.financial?.total_collected || 0;
                     totalProfit += data.financial?.remaining_balance || 0;
@@ -706,8 +707,9 @@
                 const oldPlateDisplay = renderPlateHtml(item.old_plate, item.old_province);
                 const newPlateDisplay = renderPlateHtml(item.new_plate, item.new_province);
 
-                const opStatusAction = item.status?.operation === 'เสร็จแล้ว'
-                    ? `<span class="text-green-600 font-bold bg-green-50 px-2.5 py-1 rounded border border-green-200 whitespace-nowrap">✅ เสร็จแล้ว</span>`
+                const isCompleted = item.status?.operation && item.status.operation.includes('เสร็จ');
+                const opStatusAction = isCompleted
+                    ? `<span class="text-green-600 font-bold bg-green-50 px-2.5 py-1 rounded border border-green-200 whitespace-nowrap">✅ ${item.status.operation}</span>`
                     : `<button onclick="openCompleteModal('${item.id}')" class="bg-green-600 hover:bg-green-700 text-white px-2.5 py-1 rounded text-xs font-semibold whitespace-nowrap">✅ งานเสร็จ</button>`;
 
                 let plateTag = item.status?.plate === 'มาแล้ว' ? `<span class="text-green-700 bg-green-100 px-2 py-1 rounded whitespace-nowrap">มาแล้ว</span>` : (item.status?.plate === 'รอผลิต' ? `<span class="text-yellow-700 bg-yellow-100 px-2 py-1 rounded whitespace-nowrap">รอผลิต</span>` : `<span class="text-gray-400">-</span>`);
@@ -1011,7 +1013,7 @@
             try {
                 await updateDoc(doc(db, "vehicle_services", id), {
                     completed_date: document.getElementById('modal_completed_date').value,
-                    "status.operation": "เสร็จแล้ว",
+                    "status.operation": "งานเสร็จ",
                     "status.plate": document.getElementById('modal_plate_status').value,
                     "status.pickup": document.getElementById('modal_pickup_status').value,
                     "status.accounting": document.getElementById('modal_accounting_status').value,
