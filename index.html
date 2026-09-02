@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ระบบจัดการงาน ตรอ. และทะเบียนรถ (Multi-Branch)</title>
     
+    <!-- Auth Guard: ตรวจสอบสิทธิ์ทันที ป้องกันการเข้าถึงหน้าหลักโดยไม่ล็อกอิน -->
     <script>
         const currentUser = JSON.parse(localStorage.getItem('tr_current_user'));
         if (!currentUser) {
@@ -430,6 +431,14 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, getDocs, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
+        // ประกาศตัวแปรสถานะและข้อมูลหลักไว้ด้านบนสุดป้องกัน ReferenceError
+        let allRecords = [];
+        let branchesList = [];
+        let usersList = [];
+        let currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`; 
+        let currentSearch = '';
+        let currentBranchFilter = 'all';
+
         const firebaseConfig = {
             apiKey: "AIzaSyCKcR2kwxB0Mi8KmEQ_wyCpAN7_-AAn02o",
             authDomain: "vehicle-registration-sys-5b320.firebaseapp.com",
@@ -442,10 +451,6 @@
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
-
-        let allRecords = [];
-        let branchesList = [];
-        let usersList = [];
 
         function loadProvincesDropdown() {
             const selects = document.querySelectorAll('.province-select');
@@ -614,7 +619,7 @@
                 }
             }
 
-            // กรองตามเดือนเฉพาะงานที่เสร็จแล้ว ส่วนงานที่กำลังดำเนินการให้แสดงตลอดเวลา
+            // กรองตามเดือน: งานที่กำลังดำเนินการจะแสดงผลตลอดเวลา, งานที่เสร็จแล้วจะกรองตามเดือนที่เสร็จ
             if (currentMonth !== 'all') {
                 filtered = filtered.filter(r => 
                     (r.status?.operation !== 'เสร็จแล้ว') || 
@@ -642,7 +647,6 @@
         function updateDashboard(records) {
             let totalCollected = 0, totalProfit = 0, pendingPlateCount = 0, pendingAccCount = 0;
             records.forEach(data => {
-                // คำนวณยอดเงินเฉพาะงานที่เสร็จแล้วในเดือนนั้นๆ
                 const isCompletedInMonth = data.status?.operation === 'เสร็จแล้ว' && (currentMonth === 'all' || (data.completed_date && data.completed_date.startsWith(currentMonth)));
                 if (isCompletedInMonth) {
                     totalCollected += data.financial?.total_collected || 0;
@@ -990,6 +994,7 @@
             } catch (err) { Swal.fire('Error', err.message, 'error'); }
         });
 
+        // รันตรวจสอบสิทธิ์
         checkUserPermissions();
     </script>
 </body>
