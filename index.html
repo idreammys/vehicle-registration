@@ -1,0 +1,996 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบจัดการงาน ตรอ. และทะเบียนรถ (Multi-Branch)</title>
+    
+    <script>
+        const currentUser = JSON.parse(localStorage.getItem('tr_current_user'));
+        if (!currentUser) {
+            window.location.href = 'login.html';
+        }
+
+        function setFaviconUrl(url) {
+            let link = document.querySelector("link[rel*='icon']") || document.createElement('link');
+            link.type = 'image/png';
+            link.rel = 'icon';
+            link.href = url;
+            if (!document.querySelector("link[rel*='icon']")) {
+                document.head.appendChild(link);
+            }
+        }
+        setFaviconUrl('https://cdn-icons-png.flaticon.com/512/11133/11133503.png');
+    </script>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Noto Sans Thai -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- SweetAlert2 สำหรับแจ้งเตือน Overlay สวยๆ -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        body { font-family: 'Noto Sans Thai', sans-serif; }
+        .swal2-title, .swal2-html-container { font-family: 'Noto Sans Thai', sans-serif !important; }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800 p-3 md:p-6 min-h-screen">
+
+    <!-- แอปพลิเคชันหลัก -->
+    <div id="mainApp" class="max-w-7xl mx-auto space-y-6">
+        
+        <!-- Header -->
+        <header class="bg-white p-4 md:p-5 rounded-2xl shadow-sm border border-gray-200 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div>
+                <h1 class="text-xl md:text-2xl font-bold text-gray-800">🚙 ระบบบันทึกงานและทะเบียนรถ</h1>
+                <div class="flex items-center gap-2 mt-1">
+                    <span id="currentUserTag" class="text-xs font-semibold bg-blue-100 text-blue-700 px-2.5 py-1 rounded-lg">ผู้ใช้: -</span>
+                    <span id="currentBranchTag" class="text-xs font-semibold bg-green-100 text-green-700 px-2.5 py-1 rounded-lg">สาขา: -</span>
+                </div>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+                <button id="openAdminBtn" class="bg-purple-600 hover:bg-purple-700 text-white px-3.5 py-2 rounded-xl shadow-md text-xs md:text-sm font-semibold transition hidden items-center gap-1">
+                    <span>⚙️ จัดการสาขา/ผู้ใช้</span>
+                </button>
+                <button id="toggleFormBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-2 rounded-xl shadow-md text-xs md:text-sm font-semibold transition flex items-center gap-1">
+                    <span>➕ บันทึกงานใหม่</span>
+                </button>
+                <button id="logoutBtn" class="bg-gray-200 hover:bg-red-500 hover:text-white text-gray-700 px-3.5 py-2 rounded-xl text-xs md:text-sm font-semibold transition">
+                    ออกจากระบบ
+                </button>
+            </div>
+        </header>
+
+        <!-- Dashboard สรุปยอด -->
+        <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="bg-gradient-to-br from-white to-blue-50/50 p-4 rounded-2xl shadow-sm border border-blue-100 flex items-center justify-between">
+                <div>
+                    <p class="text-xs text-gray-500 font-semibold uppercase tracking-wider">เงินเก็บรวม (เดือนที่เสร็จ)</p>
+                    <h3 id="sumTotal" class="text-xl md:text-2xl font-bold text-gray-900 mt-1">฿0</h3>
+                </div>
+                <div class="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center text-blue-600 text-lg font-bold shadow-inner">💰</div>
+            </div>
+            <div class="bg-gradient-to-br from-white to-green-50/50 p-4 rounded-2xl shadow-sm border border-green-100 flex items-center justify-between">
+                <div>
+                    <p class="text-xs text-gray-500 font-semibold uppercase tracking-wider">กำไรสุทธิ (เดือนที่เสร็จ)</p>
+                    <h3 id="sumProfit" class="text-xl md:text-2xl font-bold text-green-600 mt-1">฿0</h3>
+                </div>
+                <div class="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center text-green-600 text-lg font-bold shadow-inner">📈</div>
+            </div>
+            <div class="bg-gradient-to-br from-white to-amber-50/50 p-4 rounded-2xl shadow-sm border border-amber-100 flex items-center justify-between">
+                <div>
+                    <p class="text-xs text-gray-500 font-semibold uppercase tracking-wider">ป้ายทะเบียนรอผลิต</p>
+                    <h3 id="sumPendingPlate" class="text-xl md:text-2xl font-bold text-amber-600 mt-1">0 รายการ</h3>
+                </div>
+                <div class="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center text-amber-600 text-lg font-bold shadow-inner">🏷️</div>
+            </div>
+            <div class="bg-gradient-to-br from-white to-rose-50/50 p-4 rounded-2xl shadow-sm border border-rose-100 flex items-center justify-between">
+                <div>
+                    <p class="text-xs text-gray-500 font-semibold uppercase tracking-wider">ยังไม่ลงบัญชี</p>
+                    <h3 id="sumPendingAcc" class="text-xl md:text-2xl font-bold text-rose-600 mt-1">0 รายการ</h3>
+                </div>
+                <div class="w-10 h-10 rounded-xl bg-rose-100 flex items-center justify-center text-rose-600 text-lg font-bold shadow-inner">📑</div>
+            </div>
+        </section>
+
+        <!-- ฟอร์มบันทึก / แก้ไขข้อมูล -->
+        <section id="formContainer" class="bg-white p-6 rounded-2xl shadow-lg border border-blue-200 transition-all" style="display: none;">
+            <div class="flex justify-between items-center mb-4 pb-2 border-b">
+                <h2 id="formTitle" class="text-lg font-bold text-blue-700">➕ เพิ่มรายการบันทึกใหม่</h2>
+                <button id="closeFormBtn" class="text-gray-400 hover:text-gray-600 text-xl font-bold">&times;</button>
+            </div>
+
+            <form id="recordForm" class="space-y-4">
+                <input type="hidden" id="docId">
+
+                <!-- ตัวเลือกสาขาสำหรับ Admin ตอนบันทึกงาน -->
+                <div id="formBranchContainer" style="display: none;" class="bg-blue-50 p-3 rounded-xl border border-blue-200">
+                    <label class="block text-xs font-semibold text-blue-800 mb-1">บันทึกข้อมูลเข้าสาขา *</label>
+                    <select id="form_branch_id" class="w-full border rounded-lg p-2.5 text-sm outline-none bg-white font-medium"></select>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">1. วันที่รับงาน *</label>
+                        <input type="date" id="receive_date" required class="w-full border rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-400">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">2. ทะเบียนเก่า (หมวด-เลข) *</label>
+                        <input type="text" id="old_plate" placeholder="กกบ 555" required class="w-full border rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-400">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">จังหวัดทะเบียนเก่า *</label>
+                        <select id="old_province" required class="w-full border rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-400 province-select"></select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">3. รุ่นรถ *</label>
+                        <input type="text" id="car_model" placeholder="Honda Wave, Toyota Hilux" required class="w-full border rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-400">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">4. เรื่องที่ดำเนินการ * (พิมพ์หรือเลือก)</label>
+                        <input type="text" id="service_type" list="service_list" placeholder="ระบุเรื่องที่ดำเนินการ" required class="w-full border rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-400">
+                        <datalist id="service_list">
+                            <option value="โอน">
+                            <option value="โอน+ย้าย">
+                            <option value="แจ้งเปลี่ยนสี">
+                            <option value="จดทะเบียนใหม่">
+                            <option value="ดัดแปลงสภาพ">
+                        </datalist>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">5. ทะเบียนใหม่ (หมวด-เลข)</label>
+                            <input type="text" id="new_plate" placeholder="กก 1234" class="w-full border rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-400">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">จังหวัดทะเบียนใหม่</label>
+                            <select id="new_province" class="w-full border rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-400 province-select">
+                                <option value="">-- ไม่ระบุ --</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">เงินที่เก็บลูกค้า (฿)</label>
+                        <input type="number" id="total_collected" placeholder="ยังไม่ระบุ" class="w-full border rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-400 calc-input">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">เงินดำเนินการ (฿)</label>
+                        <input type="number" id="operation_cost" placeholder="ยังไม่ระบุ" class="w-full border rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-400 calc-input">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">หักซื้อของ/อะไหล่ (฿)</label>
+                        <input type="number" id="parts_deduction" placeholder="ยังไม่ระบุ" class="w-full border rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-400 calc-input">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-blue-700 mb-1">ยอดคงเหลือ/กำไร (฿)</label>
+                        <input type="number" id="remaining_balance" placeholder="0" readonly class="w-full border rounded-lg p-2.5 text-sm bg-gray-200 font-bold text-green-700 cursor-not-allowed">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">เบอร์โทรลูกค้า *</label>
+                        <input type="tel" id="customer_phone" placeholder="081-2345678" maxlength="11" required class="w-full border rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-400">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">วันที่งานเสร็จ</label>
+                        <input type="date" id="completed_date" class="w-full border rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-400">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">สถานะดำเนินการ</label>
+                        <select id="operation_status" class="w-full border rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-400">
+                            <option value="กำลังดำเนินการ">กำลังดำเนินการ</option>
+                            <option value="เสร็จแล้ว">เสร็จแล้ว</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">สถานะป้ายทะเบียน</label>
+                        <select id="plate_status" class="w-full border rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-400">
+                            <option value="-">-- ไม่ระบุ --</option>
+                            <option value="รอผลิต">รอผลิต</option>
+                            <option value="มาแล้ว">มาแล้ว</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">ลูกค้ารับป้าย/เอกสาร</label>
+                        <select id="pickup_status" class="w-full border rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-400">
+                            <option value="ยังไม่รับ">ยังไม่รับ</option>
+                            <option value="รับไปแล้ว">รับไปแล้ว</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">สถานะลงบัญชี</label>
+                        <select id="accounting_status" class="w-full border rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-400">
+                            <option value="ยังไม่ลงบัญชี">ยังไม่ลงบัญชี</option>
+                            <option value="ลงบัญชีแล้ว">ลงบัญชีแล้ว</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-3 pt-2">
+                    <button type="button" id="cancelFormBtn" class="px-5 py-2.5 rounded-lg border text-sm font-medium text-gray-600 hover:bg-gray-100">ยกเลิก</button>
+                    <button type="submit" id="saveBtn" class="px-6 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium shadow-md transition">บันทึกข้อมูล</button>
+                </div>
+            </form>
+        </section>
+
+        <!-- ตารางรายการข้อมูลทั้งหมด -->
+        <section class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+            <div class="p-4 md:p-5 border-b border-gray-200 bg-gray-50 flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+                <h2 class="text-base font-bold text-gray-800">📋 รายการรับงานทั้งหมด</h2>
+                
+                <div class="flex flex-wrap items-center gap-2 w-full md:w-auto">
+                    <select id="branchFilter" class="border rounded-xl px-3 py-2 text-xs md:text-sm outline-none bg-white shadow-sm font-medium" style="display: none;">
+                        <option value="all">ทุกสาขา</option>
+                    </select>
+                    <select id="monthFilter" class="border rounded-xl px-3 py-2 text-xs md:text-sm outline-none bg-white shadow-sm font-medium">
+                        <option value="all">ดูข้อมูลทุกเดือน</option>
+                    </select>
+                    <input type="text" id="searchInput" placeholder="🔍 ค้นหา ทะเบียน, เบอร์โทร..." class="flex-1 sm:w-48 border rounded-xl px-3 py-2 text-xs md:text-sm outline-none shadow-sm">
+                </div>
+            </div>
+
+            <div class="w-full overflow-x-auto">
+                <table class="w-full text-left border-collapse table-auto text-xs">
+                    <thead>
+                        <tr class="bg-gray-100 text-gray-600 uppercase tracking-wider">
+                            <th id="branchTh" class="p-2.5 border-b font-semibold" style="display: none;">สาขา</th>
+                            <th class="p-2.5 border-b font-semibold">วันที่รับ / เสร็จ</th>
+                            <th class="p-2.5 border-b font-semibold">ทะเบียนเก่า</th>
+                            <th class="p-2.5 border-b font-semibold">ทะเบียนใหม่</th>
+                            <th class="p-2.5 border-b font-semibold">รุ่นรถ / บริการ</th>
+                            <th class="p-2.5 border-b font-semibold">การเงิน (เก็บ/กำไร)</th>
+                            <th class="p-2.5 border-b font-semibold text-center">สถานะงาน</th>
+                            <th class="p-2.5 border-b font-semibold text-center">ป้ายทะเบียน</th>
+                            <th class="p-2.5 border-b font-semibold text-center">รับเอกสาร</th>
+                            <th class="p-2.5 border-b font-semibold text-center">ลงบัญชี</th>
+                            <th class="p-2.5 border-b font-semibold text-center">เบอร์โทร</th>
+                            <th class="p-2.5 border-b font-semibold text-center">จัดการ</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody" class="text-gray-700 divide-y divide-gray-100">
+                        <tr>
+                            <td colspan="12" class="p-8 text-center text-gray-400">⏳ กำลังดึงข้อมูลจาก Firebase...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+
+    <!-- 3. หน้าต่าง Admin Modal -->
+    <div id="adminModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50" style="display: none;">
+        <div class="bg-white rounded-2xl shadow-2xl border border-gray-200 max-w-2xl w-full p-6 space-y-6 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center pb-3 border-b">
+                <h3 class="text-lg font-bold text-purple-700 flex items-center gap-2">
+                    <span>⚙️ ระบบจัดการสาขาและผู้ใช้งานระบบ</span>
+                </h3>
+                <button id="closeAdminModalBtn" class="text-gray-400 hover:text-gray-600 text-2xl font-bold">&times;</button>
+            </div>
+
+            <!-- จัดการสาขา -->
+            <div class="bg-gray-50 p-4 rounded-xl border space-y-3">
+                <h4 class="text-sm font-bold text-gray-700">🏢 จัดการสาขา</h4>
+                <form id="addBranchForm" class="flex gap-2">
+                    <input type="text" id="newBranchName" required placeholder="ชื่อสาขา เช่น ตรอ.ปกรณ์ทรัพย์" class="flex-1 border rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-purple-400">
+                    <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2.5 rounded-lg text-sm font-semibold transition">เพิ่มสาขา</button>
+                </form>
+                <div class="overflow-x-auto border rounded-lg mt-2 bg-white">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead>
+                            <tr class="bg-gray-100 text-gray-600">
+                                <th class="p-2.5 border-b">ชื่อสาขา</th>
+                                <th class="p-2.5 border-b text-center">จัดการ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="branchTableBody">
+                            <tr><td colspan="2" class="p-3 text-center text-gray-400">กำลังโหลด...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- เพิ่มผู้ใช้งาน -->
+            <div class="bg-gray-50 p-4 rounded-xl border">
+                <h4 class="text-sm font-bold text-gray-700 mb-2">👤 เพิ่มผู้ใช้งาน / พนักงาน</h4>
+                <form id="addUserForm" class="space-y-3">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <input type="text" id="newUsername" required placeholder="Username ล็อกอิน" class="border rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-purple-400">
+                        <input type="password" id="newPassword" required placeholder="Password" class="border rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-purple-400">
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <select id="newUserBranch" class="border rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-purple-400">
+                            <option value="">-- เลือกสาขา (สำหรับ Staff) --</option>
+                        </select>
+                        <select id="newUserRole" required class="border rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-purple-400">
+                            <option value="staff">พนักงานทั่วไป (Staff)</option>
+                            <option value="admin">ผู้ดูแลระบบ (Admin)</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white p-2.5 rounded-lg text-sm font-semibold transition">สร้างผู้ใช้งาน</button>
+                </form>
+            </div>
+
+            <!-- รายชื่อผู้ใช้ -->
+            <div>
+                <h4 class="text-sm font-bold text-gray-700 mb-2">📋 รายชื่อผู้ใช้ในระบบทั้งหมด</h4>
+                <div class="overflow-x-auto border rounded-xl bg-white">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead>
+                            <tr class="bg-gray-100 text-gray-600">
+                                <th class="p-3 border-b">Username</th>
+                                <th class="p-3 border-b">สิทธิ์</th>
+                                <th class="p-3 border-b">สาขา</th>
+                                <th class="p-3 border-b text-center">จัดการ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="userTableBody">
+                            <tr><td colspan="4" class="p-4 text-center text-gray-400">กำลังโหลด...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- POPUP (MODAL) สำหรับบันทึกงานเสร็จ -->
+    <div id="completeModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50" style="display: none;">
+        <div class="bg-white rounded-2xl shadow-2xl border border-gray-200 max-w-md w-full p-6 space-y-4 animate-fade-in">
+            <div class="flex justify-between items-center pb-3 border-b">
+                <h3 class="text-lg font-bold text-green-700 flex items-center gap-2">
+                    <span>✅ บันทึกรายละเอียดงานเสร็จ</span>
+                </h3>
+                <button id="closeModalBtn" class="text-gray-400 hover:text-gray-600 text-2xl font-bold">&times;</button>
+            </div>
+
+            <form id="completeForm" class="space-y-4">
+                <input type="hidden" id="modal_docId">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">วันที่งานเสร็จ *</label>
+                    <input type="date" id="modal_completed_date" required class="w-full border rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-green-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">สถานะป้ายทะเบียน</label>
+                    <select id="modal_plate_status" class="w-full border rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-green-500">
+                        <option value="-">-- ไม่ระบุ --</option>
+                        <option value="รอผลิต">รอผลิต</option>
+                        <option value="มาแล้ว">มาแล้ว</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">ลูกค้ารับป้าย/เอกสาร</label>
+                    <select id="modal_pickup_status" class="w-full border rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-green-500">
+                        <option value="ยังไม่รับ">ยังไม่รับ</option>
+                        <option value="รับไปแล้ว">รับไปแล้ว</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">สถานะลงบัญชี</label>
+                    <select id="modal_accounting_status" class="w-full border rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-green-500">
+                        <option value="ยังไม่ลงบัญชี">ยังไม่ลงบัญชี</option>
+                        <option value="ลงบัญชีแล้ว">ลงบัญชีแล้ว</option>
+                    </select>
+                </div>
+                <div class="flex justify-end gap-3 pt-3 border-t">
+                    <button type="button" id="cancelModalBtn" class="px-4 py-2 rounded-xl border text-sm font-medium text-gray-600 hover:bg-gray-100">ยกเลิก</button>
+                    <button type="submit" id="saveModalBtn" class="px-5 py-2 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-medium shadow transition">บันทึกจบงาน</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Script คำนวณเงินและจัดรูปแบบเบอร์โทร -->
+    <script>
+        const elTotal = document.getElementById('total_collected');
+        const elOp = document.getElementById('operation_cost');
+        const elParts = document.getElementById('parts_deduction');
+        const elRemain = document.getElementById('remaining_balance');
+        const calcInputs = [elTotal, elOp, elParts];
+
+        calcInputs.forEach(input => {
+            input.addEventListener('input', () => {
+                if (!elTotal.value && !elOp.value && !elParts.value) {
+                    elRemain.value = '';
+                } else {
+                    const total = parseFloat(elTotal.value) || 0;
+                    const op = parseFloat(elOp.value) || 0;
+                    const parts = parseFloat(elParts.value) || 0;
+                    elRemain.value = total - (op + parts);
+                }
+            });
+        });
+
+        document.getElementById('customer_phone').addEventListener('input', function (e) {
+            let v = this.value.replace(/\D/g, '').substring(0, 10);
+            if (v.length > 3) {
+                v = v.substring(0, 3) + '-' + v.substring(3);
+            }
+            this.value = v;
+        });
+
+        document.getElementById('newUserRole').addEventListener('change', function() {
+            const branchSelect = document.getElementById('newUserBranch');
+            if (this.value === 'admin') {
+                branchSelect.value = '';
+                branchSelect.disabled = true;
+                branchSelect.classList.add('bg-gray-100');
+            } else {
+                branchSelect.disabled = false;
+                branchSelect.classList.remove('bg-gray-100');
+            }
+        });
+    </script>
+
+    <!-- Script หลักระบบจัดการข้อมูล -->
+    <script type="module">
+        import { thaiProvinces } from './provinces.js';
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, getDocs, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCKcR2kwxB0Mi8KmEQ_wyCpAN7_-AAn02o",
+            authDomain: "vehicle-registration-sys-5b320.firebaseapp.com",
+            projectId: "vehicle-registration-sys-5b320",
+            storageBucket: "vehicle-registration-sys-5b320.firebasestorage.app",
+            messagingSenderId: "357691039451",
+            appId: "1:357691039451:web:ce22c9003d942116bf76fe",
+            measurementId: "G-D3BFVMTVWM"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        let allRecords = [];
+        let branchesList = [];
+        let usersList = [];
+
+        function loadProvincesDropdown() {
+            const selects = document.querySelectorAll('.province-select');
+            selects.forEach(select => {
+                const currentVal = select.value;
+                select.innerHTML = '<option value="">-- เลือกจังหวัด --</option>';
+                thaiProvinces.forEach(province => {
+                    const opt = document.createElement('option');
+                    opt.value = province;
+                    opt.textContent = province;
+                    select.appendChild(opt);
+                });
+                select.value = currentVal;
+            });
+        }
+        loadProvincesDropdown();
+
+        function checkUserPermissions() {
+            document.getElementById('currentUserTag').innerText = `ผู้ใช้: ${currentUser.username}`;
+            if (currentUser.role === 'admin') {
+                document.getElementById('currentBranchTag').innerText = `สาขา: ผู้ดูแลระบบสูงสุด (ทุกสาขา)`;
+                document.getElementById('openAdminBtn').style.display = 'inline-flex';
+                document.getElementById('branchFilter').style.display = 'inline-block';
+                document.getElementById('branchTh').style.display = 'table-cell';
+                document.getElementById('formBranchContainer').style.display = 'block';
+            } else {
+                document.getElementById('currentBranchTag').innerText = `สาขา: ${currentUser.branchName || currentUser.branch_id}`;
+                document.getElementById('openAdminBtn').style.display = 'none';
+                document.getElementById('branchFilter').style.display = 'none';
+                document.getElementById('branchTh').style.display = 'none';
+                document.getElementById('formBranchContainer').style.display = 'none';
+            }
+            initAppData();
+        }
+
+        document.getElementById('logoutBtn').addEventListener('click', () => {
+            localStorage.removeItem('tr_current_user');
+            window.location.href = 'login.html';
+        });
+
+        function initAppData() {
+            loadBranches();
+            listenToData();
+        }
+
+        async function loadBranches() {
+            const bSnap = await getDocs(collection(db, "branches"));
+            branchesList = [];
+            bSnap.forEach(d => branchesList.push({ id: d.id, ...d.data() }));
+
+            const newUserBranch = document.getElementById('newUserBranch');
+            newUserBranch.innerHTML = '<option value="">-- เลือกสาขา (สำหรับ Staff) --</option>';
+
+            const branchFilter = document.getElementById('branchFilter');
+            branchFilter.innerHTML = '<option value="all">ทุกสาขา</option>';
+
+            const formBranch = document.getElementById('form_branch_id');
+            formBranch.innerHTML = '';
+
+            branchesList.forEach(b => {
+                newUserBranch.innerHTML += `<option value="${b.id}">${b.name}</option>`;
+                branchFilter.innerHTML += `<option value="${b.id}">${b.name}</option>`;
+                formBranch.innerHTML += `<option value="${b.id}">${b.name}</option>`;
+            });
+            branchFilter.value = currentBranchFilter;
+
+            renderBranchTable();
+            renderAdminUsers();
+        }
+
+        function renderBranchTable() {
+            const tbody = document.getElementById('branchTableBody');
+            if (branchesList.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="2" class="p-3 text-center text-gray-400">ยังไม่มีสาขา</td></tr>`;
+                return;
+            }
+            let html = '';
+            branchesList.forEach(b => {
+                html += `
+                    <tr class="border-b">
+                        <td class="p-2.5 font-medium">${b.name}</td>
+                        <td class="p-2.5 text-center space-x-1">
+                            <button onclick="editBranch('${b.id}', '${b.name}')" class="bg-amber-500 text-white px-2 py-1 rounded text-xs">แก้ไข</button>
+                            <button onclick="deleteBranch('${b.id}', '${b.name}')" class="bg-red-500 text-white px-2 py-1 rounded text-xs">ลบ</button>
+                        </td>
+                    </tr>
+                `;
+            });
+            tbody.innerHTML = html;
+        }
+
+        window.editBranch = async function(branchId, currentName) {
+            const { value: newName } = await Swal.fire({
+                title: 'แก้ไขชื่อสาขา',
+                input: 'text',
+                inputValue: currentName,
+                showCancelButton: true,
+                confirmButtonText: 'บันทึก',
+                cancelButtonText: 'ยกเลิก'
+            });
+            if (newName) {
+                await updateDoc(doc(db, "branches", branchId), { name: newName.trim() });
+                Swal.fire('สำเร็จ', 'แก้ไขชื่อสาขาเรียบร้อย', 'success');
+                loadBranches();
+            }
+        };
+
+        window.deleteBranch = async function(branchId, branchName) {
+            Swal.fire({
+                title: 'ยืนยันการลบสาขา?',
+                text: `ต้องการลบสาขา "${branchName}" ใช่หรือไม่`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'ลบ',
+                cancelButtonText: 'ยกเลิก'
+            }).then(async (res) => {
+                if (res.isConfirmed) {
+                    await deleteDoc(doc(db, "branches", branchId));
+                    Swal.fire('สำเร็จ', 'ลบสาขาเรียบร้อย', 'success');
+                    loadBranches();
+                }
+            });
+        };
+
+        function listenToData() {
+            const q = query(collection(db, "vehicle_services"), orderBy("receive_date", "desc"));
+            onSnapshot(q, (snapshot) => {
+                allRecords = [];
+                snapshot.forEach((docSnap) => {
+                    const data = docSnap.data();
+                    data.id = docSnap.id;
+                    allRecords.push(data);
+                });
+                updateMonthDropdown(); 
+                applyFilters();        
+            });
+        }
+
+        function updateMonthDropdown() {
+            const select = document.getElementById('monthFilter');
+            const monthsSet = new Set();
+            allRecords.forEach(r => {
+                if (r.completed_date) monthsSet.add(r.completed_date.substring(0, 7)); 
+            });
+            monthsSet.add(currentMonth);
+
+            const monthNames = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
+            let optionsHTML = '<option value="all">ดูข้อมูลทุกเดือน</option>';
+            Array.from(monthsSet).sort().reverse().forEach(yyyymm => {
+                const [year, month] = yyyymm.split('-');
+                optionsHTML += `<option value="${yyyymm}">${monthNames[parseInt(month) - 1]} ${parseInt(year) + 543}</option>`;
+            });
+            select.innerHTML = optionsHTML;
+            select.value = currentMonth;
+        }
+
+        function applyFilters() {
+            let filtered = allRecords;
+
+            // กรองตามสิทธิ์สาขา
+            if (currentUser.role === 'staff') {
+                filtered = filtered.filter(r => r.branch_id === currentUser.branch_id);
+            } else if (currentUser.role === 'admin') {
+                if (currentBranchFilter !== 'all') {
+                    filtered = filtered.filter(r => r.branch_id === currentBranchFilter);
+                }
+            }
+
+            // กรองตามเดือนเฉพาะงานที่เสร็จแล้ว ส่วนงานที่กำลังดำเนินการให้แสดงตลอดเวลา
+            if (currentMonth !== 'all') {
+                filtered = filtered.filter(r => 
+                    (r.status?.operation !== 'เสร็จแล้ว') || 
+                    (r.completed_date && r.completed_date.startsWith(currentMonth))
+                );
+            }
+
+            if (currentSearch) {
+                const term = currentSearch.toLowerCase();
+                filtered = filtered.filter(r => 
+                    (r.old_plate && r.old_plate.toLowerCase().includes(term)) ||
+                    (r.new_plate && r.new_plate.toLowerCase().includes(term)) ||
+                    (r.customer_phone && r.customer_phone.toLowerCase().includes(term))
+                );
+            }
+
+            updateDashboard(filtered); 
+            renderTable(filtered);
+        }
+
+        document.getElementById('monthFilter').addEventListener('change', (e) => { currentMonth = e.target.value; applyFilters(); });
+        document.getElementById('branchFilter').addEventListener('change', (e) => { currentBranchFilter = e.target.value; applyFilters(); });
+        document.getElementById('searchInput').addEventListener('input', (e) => { currentSearch = e.target.value; applyFilters(); });
+
+        function updateDashboard(records) {
+            let totalCollected = 0, totalProfit = 0, pendingPlateCount = 0, pendingAccCount = 0;
+            records.forEach(data => {
+                // คำนวณยอดเงินเฉพาะงานที่เสร็จแล้วในเดือนนั้นๆ
+                const isCompletedInMonth = data.status?.operation === 'เสร็จแล้ว' && (currentMonth === 'all' || (data.completed_date && data.completed_date.startsWith(currentMonth)));
+                if (isCompletedInMonth) {
+                    totalCollected += data.financial?.total_collected || 0;
+                    totalProfit += data.financial?.remaining_balance || 0;
+                }
+                if (data.status?.plate === 'รอผลิต') pendingPlateCount++;
+                if (data.status?.accounting === 'ยังไม่ลงบัญชี') pendingAccCount++;
+            });
+            document.getElementById('sumTotal').innerText = `฿${totalCollected.toLocaleString()}`;
+            document.getElementById('sumProfit').innerText = `฿${totalProfit.toLocaleString()}`;
+            document.getElementById('sumPendingPlate').innerText = `${pendingPlateCount} รายการ`;
+            document.getElementById('sumPendingAcc').innerText = `${pendingAccCount} รายการ`;
+        }
+
+        function formatThaiDate(dateStr) {
+            if (!dateStr) return '-';
+            const parts = dateStr.split('-');
+            if (parts.length !== 3) return dateStr;
+            const monthNames = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
+            return `${parts[2]} ${monthNames[parseInt(parts[1]) - 1]} ${parseInt(parts[0]) + 543}`;
+        }
+
+        function renderPlateHtml(plate, province) {
+            if (!plate) return '-';
+            plate = plate.trim();
+            if (province && province !== '-' && province !== '') {
+                return `${plate}<br><span class="text-[11px] font-normal text-gray-500">${province}</span>`;
+            }
+            return `${plate}`;
+        }
+
+        function renderTable(records) {
+            const tbody = document.getElementById('tableBody');
+            if (records.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="12" class="p-8 text-center text-gray-400">ไม่พบข้อมูลในระบบ</td></tr>`;
+                return;
+            }
+
+            let html = '';
+            records.forEach((item) => {
+                const branchObj = branchesList.find(b => b.id === item.branch_id);
+                const branchName = branchObj ? branchObj.name : '-';
+                
+                const receiveDateFormatted = formatThaiDate(item.receive_date);
+                const completedDateFormatted = formatThaiDate(item.completed_date);
+
+                const oldPlateDisplay = renderPlateHtml(item.old_plate, item.old_province);
+                const newPlateDisplay = renderPlateHtml(item.new_plate, item.new_province);
+
+                const opStatusAction = item.status?.operation === 'เสร็จแล้ว'
+                    ? `<span class="text-green-600 font-bold bg-green-50 px-2.5 py-1 rounded border border-green-200 whitespace-nowrap">✅ เสร็จแล้ว</span>`
+                    : `<button onclick="openCompleteModal('${item.id}')" class="bg-green-600 hover:bg-green-700 text-white px-2.5 py-1 rounded text-xs font-semibold whitespace-nowrap">✅ งานเสร็จ</button>`;
+
+                let plateTag = item.status?.plate === 'มาแล้ว' ? `<span class="text-green-700 bg-green-100 px-2 py-1 rounded whitespace-nowrap">มาแล้ว</span>` : (item.status?.plate === 'รอผลิต' ? `<span class="text-yellow-700 bg-yellow-100 px-2 py-1 rounded whitespace-nowrap">รอผลิต</span>` : `<span class="text-gray-400">-</span>`);
+                let pickupTag = item.status?.pickup === 'รับไปแล้ว' ? `<span class="text-purple-700 bg-purple-100 px-2 py-1 rounded whitespace-nowrap">รับไปแล้ว</span>` : `<button onclick="confirmQuickUpdate('${item.id}', 'pickup', 'รับไปแล้ว', 'ลูกค้ามารับเอกสารแล้ว')" class="text-purple-600 border border-purple-200 px-2 py-1 rounded bg-white whitespace-nowrap">กดรับแล้ว</button>`;
+                let accTag = item.status?.accounting === 'ลงบัญชีแล้ว' ? `<span class="text-blue-700 bg-blue-100 px-2 py-1 rounded whitespace-nowrap">ลงบัญชีแล้ว</span>` : `<button onclick="confirmQuickUpdate('${item.id}', 'accounting', 'ลงบัญชีแล้ว', 'ลงบัญชีเรียบร้อย')" class="text-blue-600 border border-blue-200 px-2 py-1 rounded bg-white whitespace-nowrap">ลงบัญชี</button>`;
+
+                const phoneValue = item.customer_phone ? `<a href="tel:${item.customer_phone}" class="text-green-700 font-semibold inline-flex items-center gap-1 whitespace-nowrap">📞 ${item.customer_phone}</a>` : '-';
+
+                html += `
+                    <tr class="hover:bg-blue-50/50 transition border-b border-gray-100">
+                        <td class="p-2.5 font-semibold text-purple-600" style="display: ${currentUser.role === 'admin' ? 'table-cell' : 'none'};">${branchName}</td>
+                        <td class="p-2.5 leading-tight whitespace-nowrap">
+                            <span class="text-gray-500 text-[11px]">รับ: ${receiveDateFormatted}</span><br>
+                            <span class="text-blue-700 font-medium text-[11px]">เสร็จ: ${completedDateFormatted}</span>
+                        </td>
+                        <td class="p-2.5 font-bold text-gray-800 whitespace-nowrap">${oldPlateDisplay}</td>
+                        <td class="p-2.5 font-bold text-purple-700 whitespace-nowrap">${newPlateDisplay}</td>
+                        <td class="p-2.5 leading-tight whitespace-nowrap">
+                            <span class="font-semibold text-gray-800">${item.car_model || '-'}</span><br>
+                            <span class="text-blue-600 text-[11px]">(${item.service_type || '-'})</span>
+                        </td>
+                        <td class="p-2.5 leading-tight whitespace-nowrap">
+                            <span class="text-gray-700 text-[11px]">เก็บ: ฿${(item.financial?.total_collected || 0).toLocaleString()}</span><br>
+                            <span class="font-bold text-green-600 text-[11px]">กำไร: ฿${(item.financial?.remaining_balance || 0).toLocaleString()}</span>
+                        </td>
+                        <td class="p-2.5 text-center whitespace-nowrap">${opStatusAction}</td>
+                        <td class="p-2.5 text-center whitespace-nowrap">${plateTag}</td>
+                        <td class="p-2.5 text-center whitespace-nowrap">${pickupTag}</td>
+                        <td class="p-2.5 text-center whitespace-nowrap">${accTag}</td>
+                        <td class="p-2.5 text-center whitespace-nowrap">${phoneValue}</td>
+                        <td class="p-2.5 text-center whitespace-nowrap space-x-1">
+                            <button onclick="editRecord('${item.id}')" class="bg-amber-500 hover:bg-amber-600 text-white px-2 py-1 rounded text-[11px] font-medium">แก้ไข</button>
+                            <button onclick="confirmDelete('${item.id}', '${item.old_plate}')" class="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-[11px] font-medium">ลบ</button>
+                        </td>
+                    </tr>
+                `;
+            });
+            tbody.innerHTML = html;
+        }
+
+        const adminModal = document.getElementById('adminModal');
+        document.getElementById('openAdminBtn').addEventListener('click', () => { adminModal.style.display = 'flex'; });
+        document.getElementById('closeAdminModalBtn').addEventListener('click', () => { adminModal.style.display = 'none'; });
+
+        document.getElementById('addBranchForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const name = document.getElementById('newBranchName').value.trim();
+            const id = 'branch_' + Date.now();
+            try {
+                await setDoc(doc(db, "branches", id), { name });
+                document.getElementById('newBranchName').value = '';
+                Swal.fire('สำเร็จ', 'เพิ่มสาขาเรียบร้อยแล้ว', 'success');
+                loadBranches();
+            } catch (err) { Swal.fire('Error', err.message, 'error'); }
+        });
+
+        document.getElementById('addUserForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('newUsername').value.trim();
+            const password = document.getElementById('newPassword').value.trim();
+            const branch_id = document.getElementById('newUserBranch').value;
+            const role = document.getElementById('newUserRole').value;
+
+            if (role === 'staff' && !branch_id) {
+                Swal.fire('แจ้งเตือน', 'กรุณาเลือกสาขาสำหรับพนักงานทั่วไป', 'warning');
+                return;
+            }
+
+            try {
+                await setDoc(doc(db, "users", username), { 
+                    username, 
+                    password, 
+                    branch_id: role === 'admin' ? '' : branch_id, 
+                    role 
+                });
+                document.getElementById('addUserForm').reset();
+                Swal.fire('สำเร็จ', 'สร้างผู้ใช้งานเรียบร้อยแล้ว', 'success');
+                renderAdminUsers();
+            } catch (err) { Swal.fire('Error', err.message, 'error'); }
+        });
+
+        async function renderAdminUsers() {
+            const uSnap = await getDocs(collection(db, "users"));
+            usersList = [];
+            uSnap.forEach(d => usersList.push(d.data()));
+
+            const tbody = document.getElementById('userTableBody');
+            let html = '';
+            usersList.forEach(u => {
+                const b = branchesList.find(br => br.id === u.branch_id);
+                const branchDisplay = u.role === 'admin' ? 'ทุกสาขา (แอดมิน)' : (b ? b.name : u.branch_id);
+                html += `
+                    <tr class="border-b">
+                        <td class="p-3 font-semibold">${u.username}</td>
+                        <td class="p-3"><span class="px-2 py-0.5 rounded text-xs ${u.role === 'admin' ? 'bg-purple-100 text-purple-700 font-bold' : 'bg-gray-100 text-gray-700'}">${u.role}</span></td>
+                        <td class="p-3">${branchDisplay}</td>
+                        <td class="p-3 text-center space-x-1">
+                            <button onclick="editUserPassword('${u.username}')" class="bg-amber-500 text-white px-2 py-1 rounded text-xs">แก้รหัส</button>
+                            ${u.username !== 'admin' ? `<button onclick="deleteUser('${u.username}')" class="bg-red-500 text-white px-2 py-1 rounded text-xs">ลบ</button>` : ''}
+                        </td>
+                    </tr>
+                `;
+            });
+            tbody.innerHTML = html;
+        }
+
+        window.editUserPassword = async function(username) {
+            const { value: newPassword } = await Swal.fire({
+                title: `เปลี่ยนรหัสผ่าน: ${username}`,
+                input: 'password',
+                inputPlaceholder: 'กรอกรหัสผ่านใหม่',
+                showCancelButton: true,
+                confirmButtonText: 'บันทึก',
+                cancelButtonText: 'ยกเลิก'
+            });
+            if (newPassword) {
+                try {
+                    await updateDoc(doc(db, "users", username), { password: newPassword.trim() });
+                    Swal.fire('สำเร็จ', 'เปลี่ยนรหัสผ่านเรียบร้อยแล้ว', 'success');
+                } catch (err) {
+                    Swal.fire('Error', err.message, 'error');
+                }
+            }
+        };
+
+        window.deleteUser = async function(username) {
+            Swal.fire({
+                title: 'ยืนยันการลบ?', text: `ต้องการลบผู้ใช้ ${username} ใช่หรือไม่`, icon: 'warning',
+                showCancelButton: true, confirmButtonText: 'ลบ', cancelButtonText: 'ยกเลิก'
+            }).then(async (res) => {
+                if (res.isConfirmed) {
+                    await deleteDoc(doc(db, "users", username));
+                    renderAdminUsers();
+                    Swal.fire('สำเร็จ', 'ลบผู้ใช้แล้ว', 'success');
+                }
+            });
+        };
+
+        const formContainer = document.getElementById('formContainer');
+        document.getElementById('toggleFormBtn').addEventListener('click', () => {
+            resetForm();
+            document.getElementById('formTitle').innerText = '➕ เพิ่มรายการบันทึกใหม่';
+            formContainer.style.display = 'block';
+            formContainer.scrollIntoView({ behavior: 'smooth' });
+        });
+        document.getElementById('closeFormBtn').addEventListener('click', () => formContainer.style.display = 'none');
+        document.getElementById('cancelFormBtn').addEventListener('click', () => formContainer.style.display = 'none');
+
+        function resetForm() {
+            document.getElementById('docId').value = '';
+            document.getElementById('recordForm').reset();
+            const today = new Date();
+            document.getElementById('receive_date').value = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+            if (currentUser.role === 'admin' && branchesList.length > 0) {
+                document.getElementById('form_branch_id').value = branchesList[0].id;
+            }
+        }
+
+        document.getElementById('recordForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const docId = document.getElementById('docId').value;
+            const targetBranchId = currentUser.role === 'admin' ? document.getElementById('form_branch_id').value : currentUser.branch_id;
+
+            const recordData = {
+                branch_id: targetBranchId,
+                receive_date: document.getElementById('receive_date').value,
+                old_plate: document.getElementById('old_plate').value,
+                old_province: document.getElementById('old_province').value,
+                car_model: document.getElementById('car_model').value,
+                service_type: document.getElementById('service_type').value,
+                new_plate: document.getElementById('new_plate').value,
+                new_province: document.getElementById('new_province').value,
+                financial: {
+                    total_collected: parseFloat(document.getElementById('total_collected').value) || 0,
+                    operation_cost: parseFloat(document.getElementById('operation_cost').value) || 0,
+                    parts_deduction: parseFloat(document.getElementById('parts_deduction').value) || 0,
+                    remaining_balance: parseFloat(document.getElementById('remaining_balance').value) || 0
+                },
+                customer_phone: document.getElementById('customer_phone').value,
+                completed_date: document.getElementById('completed_date').value,
+                status: {
+                    operation: document.getElementById('operation_status').value,
+                    plate: document.getElementById('plate_status').value,
+                    pickup: document.getElementById('pickup_status').value,
+                    accounting: document.getElementById('accounting_status').value
+                },
+                updated_at: new Date()
+            };
+
+            try {
+                if (docId) {
+                    await updateDoc(doc(db, "vehicle_services", docId), recordData);
+                    Swal.fire({ title: 'สำเร็จ!', text: 'อัปเดตข้อมูลเรียบร้อยแล้ว', icon: 'success' });
+                } else {
+                    recordData.created_at = new Date();
+                    await addDoc(collection(db, "vehicle_services"), recordData);
+                    Swal.fire({ title: 'สำเร็จ!', text: 'เพิ่มรายการใหม่สำเร็จ', icon: 'success' });
+                }
+                resetForm();
+                formContainer.style.display = 'none';
+            } catch (error) {
+                Swal.fire('ข้อผิดพลาด!', error.message, 'error');
+            }
+        });
+
+        window.editRecord = function(id) {
+            const item = allRecords.find(r => r.id === id);
+            if (!item) return;
+
+            document.getElementById('docId').value = item.id;
+            if (currentUser.role === 'admin') {
+                document.getElementById('form_branch_id').value = item.branch_id || '';
+            }
+            document.getElementById('receive_date').value = item.receive_date || '';
+            document.getElementById('old_plate').value = item.old_plate || '';
+            document.getElementById('old_province').value = item.old_province || '';
+            document.getElementById('car_model').value = item.car_model || '';
+            document.getElementById('service_type').value = item.service_type || '';
+            document.getElementById('new_plate').value = item.new_plate || '';
+            document.getElementById('new_province').value = item.new_province || '';
+
+            document.getElementById('total_collected').value = item.financial?.total_collected || '';
+            document.getElementById('operation_cost').value = item.financial?.operation_cost || '';
+            document.getElementById('parts_deduction').value = item.financial?.parts_deduction || '';
+            document.getElementById('remaining_balance').value = item.financial?.remaining_balance || '';
+
+            document.getElementById('customer_phone').value = item.customer_phone || '';
+            document.getElementById('completed_date').value = item.completed_date || '';
+            document.getElementById('operation_status').value = item.status?.operation || 'กำลังดำเนินการ'; 
+            document.getElementById('plate_status').value = item.status?.plate || '-';
+            document.getElementById('pickup_status').value = item.status?.pickup || 'ยังไม่รับ';
+            document.getElementById('accounting_status').value = item.status?.accounting || 'ยังไม่ลงบัญชี';
+
+            document.getElementById('formTitle').innerText = '✏️ แก้ไขรายการบันทึก';
+            formContainer.style.display = 'block';
+            formContainer.scrollIntoView({ behavior: 'smooth' });
+        };
+
+        window.confirmQuickUpdate = function(id, fieldName, newValue, actionLabel) {
+            Swal.fire({
+                title: 'ยืนยันสถานะ?', text: `ต้องการอัปเดตเป็น "${actionLabel}" ใช่หรือไม่?`, icon: 'question',
+                showCancelButton: true, confirmButtonText: 'ตกลง', cancelButtonText: 'ยกเลิก'
+            }).then((res) => { if (res.isConfirmed) quickUpdate(id, fieldName, newValue); });
+        };
+
+        async function quickUpdate(id, fieldName, newValue) {
+            try {
+                await updateDoc(doc(db, "vehicle_services", id), { [`status.${fieldName}`]: newValue, updated_at: new Date() });
+                Swal.fire({ title: 'อัปเดตสำเร็จ!', icon: 'success', timer: 1500, showConfirmButton: false });
+            } catch (err) { Swal.fire('Error', err.message, 'error'); }
+        }
+
+        window.confirmDelete = function(id, plate) {
+            Swal.fire({
+                title: 'ยืนยันการลบ?', text: `ต้องการลบรายการทะเบียน "${plate}" ใช่หรือไม่?`, icon: 'warning',
+                showCancelButton: true, confirmButtonText: 'ใช่, ลบเลย!', cancelButtonText: 'ยกเลิก'
+            }).then(async (res) => {
+                if (res.isConfirmed) {
+                    await deleteDoc(doc(db, "vehicle_services", id));
+                    Swal.fire('ลบสำเร็จ!', 'ลบรายการเรียบร้อยแล้ว', 'success');
+                }
+            });
+        };
+
+        const completeModal = document.getElementById('completeModal');
+        window.openCompleteModal = function(id) {
+            const item = allRecords.find(r => r.id === id);
+            if (!item) return;
+            document.getElementById('modal_docId').value = item.id;
+            const today = new Date();
+            document.getElementById('modal_completed_date').value = item.completed_date || `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+            document.getElementById('modal_plate_status').value = item.status?.plate || '-';
+            document.getElementById('modal_pickup_status').value = item.status?.pickup || 'ยังไม่รับ';
+            document.getElementById('modal_accounting_status').value = item.status?.accounting || 'ยังไม่ลงบัญชี';
+            completeModal.style.display = 'flex';
+        };
+        document.getElementById('closeModalBtn').addEventListener('click', () => completeModal.style.display = 'none');
+        document.getElementById('cancelModalBtn').addEventListener('click', () => completeModal.style.display = 'none');
+
+        document.getElementById('completeForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('modal_docId').value;
+            try {
+                await updateDoc(doc(db, "vehicle_services", id), {
+                    completed_date: document.getElementById('modal_completed_date').value,
+                    "status.operation": "เสร็จแล้ว",
+                    "status.plate": document.getElementById('modal_plate_status').value,
+                    "status.pickup": document.getElementById('modal_pickup_status').value,
+                    "status.accounting": document.getElementById('modal_accounting_status').value,
+                    updated_at: new Date()
+                });
+                completeModal.style.display = 'none';
+                Swal.fire({ title: 'จบงานสำเร็จ!', icon: 'success', timer: 1500, showConfirmButton: false });
+            } catch (err) { Swal.fire('Error', err.message, 'error'); }
+        });
+
+        checkUserPermissions();
+    </script>
+</body>
+</html>

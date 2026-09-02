@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>เข้าสู่ระบบ - ระบบจัดการงาน ตรอ.</title>
+    
+    <script>
+        function setFaviconUrl(url) {
+            let link = document.querySelector("link[rel*='icon']") || document.createElement('link');
+            link.type = 'image/png';
+            link.rel = 'icon';
+            link.href = url;
+            if (!document.querySelector("link[rel*='icon']")) {
+                document.head.appendChild(link);
+            }
+        }
+        setFaviconUrl('https://cdn-icons-png.flaticon.com/512/11133/11133503.png');
+
+        if (localStorage.getItem('tr_current_user')) {
+            window.location.href = 'index.html';
+        }
+    </script>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        body { font-family: 'Noto Sans Thai', sans-serif; }
+        .swal2-title, .swal2-html-container { font-family: 'Noto Sans Thai', sans-serif !important; }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800 flex items-center justify-center min-h-screen p-4">
+
+    <div class="max-w-md w-full bg-white p-8 rounded-2xl shadow-xl border border-gray-200">
+        <div class="text-center mb-6">
+            <h2 class="text-2xl font-bold text-gray-800">🔐 เข้าสู่ระบบ ตรอ.</h2>
+            <p class="text-xs text-gray-500 mt-1">กรอกชื่อผู้ใช้และรหัสผ่านเพื่อเข้าใช้งานระบบ</p>
+        </div>
+        <form id="loginForm" class="space-y-4">
+            <div>
+                <label class="block text-xs font-semibold text-gray-700 mb-1">ชื่อผู้ใช้งาน (Username)</label>
+                <input type="text" id="loginUsername" required placeholder="admin" class="w-full border rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-blue-400">
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-gray-700 mb-1">รหัสผ่าน (Password)</label>
+                <input type="password" id="loginPassword" required placeholder="••••••••" class="w-full border rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-blue-400">
+            </div>
+            <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold p-3 rounded-xl shadow-md transition">เข้าสู่ระบบ</button>
+        </form>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, collection, getDocs, setDoc, doc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCKcR2kwxB0Mi8KmEQ_wyCpAN7_-AAn02o",
+            authDomain: "vehicle-registration-sys-5b320.firebaseapp.com",
+            projectId: "vehicle-registration-sys-5b320",
+            storageBucket: "vehicle-registration-sys-5b320.firebasestorage.app",
+            messagingSenderId: "357691039451",
+            appId: "1:357691039451:web:ce22c9003d942116bf76fe",
+            measurementId: "G-D3BFVMTVWM"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        async function initDefaultAdmin() {
+            try {
+                const usersSnap = await getDocs(collection(db, "users"));
+                if (usersSnap.empty) {
+                    await setDoc(doc(db, "branches", "branch_main"), { name: "สาขาหลัก" });
+                    await setDoc(doc(db, "users", "admin"), {
+                        username: "admin",
+                        password: "123456",
+                        branch_id: "",
+                        role: "admin"
+                    });
+                }
+            } catch (e) { console.error("Init error:", e); }
+        }
+        initDefaultAdmin();
+
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const u = document.getElementById('loginUsername').value.trim();
+            const p = document.getElementById('loginPassword').value.trim();
+
+            try {
+                const userSnap = await getDocs(collection(db, "users"));
+                let foundUser = null;
+
+                userSnap.forEach(docSnap => {
+                    const data = docSnap.data();
+                    if (data.username === u && data.password === p) {
+                        foundUser = data;
+                    }
+                });
+
+                if (foundUser) {
+                    let branchName = "ทุกสาขา";
+                    if (foundUser.branch_id) {
+                        const bSnap = await getDocs(collection(db, "branches"));
+                        bSnap.forEach(b => {
+                            if (b.id === foundUser.branch_id) branchName = b.data().name;
+                        });
+                    }
+
+                    const currentUser = { ...foundUser, branchName };
+                    localStorage.setItem('tr_current_user', JSON.stringify(currentUser));
+                    window.location.href = 'index.html';
+                } else {
+                    Swal.fire('เข้าสู่ระบบไม่สำเร็จ', 'ชื่อผู้ใช้งานหรือรหัสผ่านไม่ถูกต้อง', 'error');
+                }
+            } catch (err) {
+                Swal.fire('เกิดข้อผิดพลาด', err.message, 'error');
+            }
+        });
+    </script>
+</body>
+</html>
