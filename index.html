@@ -103,7 +103,6 @@
             <form id="recordForm" class="space-y-4">
                 <input type="hidden" id="docId">
 
-                <!-- ตัวเลือกสาขาสำหรับ Admin ตอนบันทึกงาน -->
                 <div id="formBranchContainer" style="display: none;" class="bg-blue-50 p-3 rounded-xl border border-blue-200">
                     <label class="block text-xs font-semibold text-blue-800 mb-1">บันทึกข้อมูลเข้าสาขา *</label>
                     <select id="form_branch_id" class="w-full border rounded-lg p-2.5 text-sm outline-none bg-white font-medium"></select>
@@ -223,6 +222,9 @@
                 <h2 class="text-base font-bold text-gray-800">📋 รายการรับงานทั้งหมด</h2>
                 
                 <div class="flex flex-wrap items-center gap-2 w-full md:w-auto">
+                    <button id="printReportBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-xl shadow-sm text-xs md:text-sm font-semibold transition flex items-center gap-1">
+                        <span>🖨️ พิมพ์รายงาน</span>
+                    </button>
                     <select id="branchFilter" class="border rounded-xl px-3 py-2 text-xs md:text-sm outline-none bg-white shadow-sm font-medium" style="display: none;">
                         <option value="all">ทุกสาขา</option>
                     </select>
@@ -428,9 +430,10 @@
         });
     </script>
 
-    <!-- Script หลักระบบจัดการข้อมูล -->
+    <!-- Script หลักระบบจัดการข้อมูล (เรียกใช้งาน report.js) -->
     <script type="module">
         import { thaiProvinces } from './provinces.js';
+        import { openPrintReportModal } from './report.js';
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, getDocs, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
@@ -670,6 +673,12 @@
             return `${parts[2]} ${monthNames[parseInt(parts[1]) - 1]} ${parseInt(parts[0]) + 543}`;
         }
 
+        function formatMonthTitle(ym) {
+            const [year, month] = ym.split('-');
+            const monthNames = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
+            return `${monthNames[parseInt(month) - 1]} ${parseInt(year) + 543}`;
+        }
+
         function renderPlateHtml(plate, province) {
             if (!plate) return '-';
             plate = plate.trim();
@@ -703,7 +712,6 @@
 
                 let plateTag = item.status?.plate === 'มาแล้ว' ? `<span class="text-green-700 bg-green-100 px-2 py-1 rounded whitespace-nowrap">มาแล้ว</span>` : (item.status?.plate === 'รอผลิต' ? `<span class="text-yellow-700 bg-yellow-100 px-2 py-1 rounded whitespace-nowrap">รอผลิต</span>` : `<span class="text-gray-400">-</span>`);
                 
-                // รับเอกสาร: ถ้ารับแล้วแสดง "รับแล้ว", ถ้ายังไม่รับแสดงปุ่มสีเหลือง "ยังไม่มารับ"
                 let pickupTag = (item.status?.pickup === 'รับแล้ว' || item.status?.pickup === 'รับไปแล้ว') 
                     ? `<span class="text-purple-700 bg-purple-100 px-2 py-1 rounded whitespace-nowrap">รับแล้ว</span>` 
                     : `<button onclick="confirmQuickUpdate('${item.id}', 'pickup', 'รับแล้ว', 'ลูกค้ามารับเอกสารแล้ว')" class="bg-yellow-100 hover:bg-yellow-200 text-yellow-700 border border-yellow-300 px-2 py-1 rounded whitespace-nowrap font-medium">ยังไม่มารับ</button>`;
@@ -745,6 +753,11 @@
             });
             tbody.innerHTML = html;
         }
+
+        // ผูกปุ่มพิมพ์รายงานเรียกใช้งานฟังก์ชันจาก report.js
+        document.getElementById('printReportBtn').addEventListener('click', () => {
+            openPrintReportModal(allRecords, branchesList, currentUser, currentBranchFilter, document.getElementById('monthFilter'), currentMonth, formatThaiDate, formatMonthTitle);
+        });
 
         const adminModal = document.getElementById('adminModal');
         document.getElementById('openAdminBtn').addEventListener('click', () => { adminModal.style.display = 'flex'; });
@@ -961,7 +974,7 @@
         window.confirmDelete = function(id, plate) {
             Swal.fire({
                 title: 'ยืนยันการลบ?', text: `ต้องการลบรายการทะเบียน "${plate}" ใช่หรือไม่?`, icon: 'warning',
-                showCancelButton: true, confirmButtonText: 'ใช่, ลบเลย!', cancelButtonText: 'ยกเลิก'
+                showCancelButton: type = 'true', confirmButtonText: 'ใช่, ลบเลย!', cancelButtonText: 'ยกเลิก'
             }).then(async (res) => {
                 if (res.isConfirmed) {
                     await deleteDoc(doc(db, "vehicle_services", id));
