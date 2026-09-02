@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ระบบจัดการงาน ตรอ. และทะเบียนรถ (Multi-Branch)</title>
     
-    <!-- Auth Guard: ตรวจสอบสิทธิ์ทันที ป้องกันการเข้าถึงหน้าหลักโดยไม่ล็อกอิน -->
     <script>
         const currentUser = JSON.parse(localStorage.getItem('tr_current_user'));
         if (!currentUser) {
@@ -431,14 +430,6 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, getDocs, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-        // ประกาศตัวแปรสถานะและข้อมูลหลักไว้ด้านบนสุดป้องกัน ReferenceError
-        let allRecords = [];
-        let branchesList = [];
-        let usersList = [];
-        let currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`; 
-        let currentSearch = '';
-        let currentBranchFilter = 'all';
-
         const firebaseConfig = {
             apiKey: "AIzaSyCKcR2kwxB0Mi8KmEQ_wyCpAN7_-AAn02o",
             authDomain: "vehicle-registration-sys-5b320.firebaseapp.com",
@@ -451,6 +442,14 @@
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
+
+        let allRecords = [];
+        let branchesList = [];
+        let usersList = [];
+        const now = new Date();
+        let currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`; 
+        let currentSearch = '';
+        let currentBranchFilter = 'all';
 
         function loadProvincesDropdown() {
             const selects = document.querySelectorAll('.province-select');
