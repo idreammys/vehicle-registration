@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>เข้าสู่ระบบ - ระบบจัดการงาน ตรอ.</title>
+    <title>เข้าสู่ระบบ - ระบบจัดงานทะเบียนรถ</title>
     
     <script>
         function setFaviconUrl(url) {
@@ -17,6 +17,7 @@
         }
         setFaviconUrl('https://cdn-icons-png.flaticon.com/512/11133/11133503.png');
 
+        // ถ้าล็อกอินอยู่แล้ว ให้เด้งไปหน้าหลักทันที
         if (localStorage.getItem('tr_current_user')) {
             window.location.href = 'index.html';
         }
@@ -31,6 +32,14 @@
     </style>
 </head>
 <body class="bg-gray-100 text-gray-800 flex items-center justify-center min-h-screen p-4">
+
+    <!-- Loading Overlay (วงกลมหมุนๆ แสดงเวลากำลังเข้าสู่ระบบ) -->
+    <div id="loadingOverlay" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex flex-col items-center justify-center z-50 hidden">
+        <div class="bg-white p-6 rounded-2xl shadow-2xl flex flex-col items-center space-y-3 animate-fade-in">
+            <div class="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+            <p class="text-sm font-semibold text-gray-700">กำลังเข้าสู่ระบบ กรุณารอสักครู่...</p>
+        </div>
+    </div>
 
     <div class="max-w-md w-full bg-white p-8 rounded-2xl shadow-xl border border-gray-200">
         <div class="text-center mb-6">
@@ -88,6 +97,9 @@
             const u = document.getElementById('loginUsername').value.trim();
             const p = document.getElementById('loginPassword').value.trim();
 
+            // แสดง Loading Overlay ทันทีเมื่อกดปุ่ม
+            document.getElementById('loadingOverlay').classList.remove('hidden');
+
             try {
                 const userSnap = await getDocs(collection(db, "users"));
                 let foundUser = null;
@@ -112,9 +124,12 @@
                     localStorage.setItem('tr_current_user', JSON.stringify(currentUser));
                     window.location.href = 'index.html';
                 } else {
+                    // ซ่อน Loading ถ้าข้อมูลไม่ถูกต้อง
+                    document.getElementById('loadingOverlay').classList.add('hidden');
                     Swal.fire('เข้าสู่ระบบไม่สำเร็จ', 'ชื่อผู้ใช้งานหรือรหัสผ่านไม่ถูกต้อง', 'error');
                 }
             } catch (err) {
+                document.getElementById('loadingOverlay').classList.add('hidden');
                 Swal.fire('เกิดข้อผิดพลาด', err.message, 'error');
             }
         });
