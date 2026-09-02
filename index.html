@@ -654,8 +654,10 @@
                 const isCompleted = data.status?.operation && data.status.operation.includes('เสร็จ');
                 const isCompletedInMonth = isCompleted && (currentMonth === 'all' || (data.completed_date && data.completed_date.startsWith(currentMonth)));
                 if (isCompletedInMonth) {
-                    totalCollected += Number(data.financial?.total_collected) || 0;
-                    totalProfit += Number(data.financial?.remaining_balance) || 0;
+                    let colVal = String(data.financial?.total_collected || '0').replace(/,/g, '');
+                    let remVal = String(data.financial?.remaining_balance || '0').replace(/,/g, '');
+                    totalCollected += parseFloat(colVal) || 0;
+                    totalProfit += parseFloat(remVal) || 0;
                 }
                 if (data.status?.plate === 'รอผลิต') pendingPlateCount++;
                 if (data.status?.accounting === 'ยังไม่ลงบัญชี') pendingAccCount++;
@@ -689,6 +691,22 @@
             return `${plate}`;
         }
 
+        window.togglePlateStatus = function(id, currentPlate, isCompleted) {
+            if (!isCompleted) {
+                Swal.fire('แจ้งเตือน', 'คุณต้องกดงานเสร็จก่อนถึงจะใช้งานได้', 'warning');
+                return;
+            }
+            let nextPlate = '-';
+            if (currentPlate === '-' || !currentPlate) nextPlate = 'รอผลิต';
+            else if (currentPlate === 'รอผลิต') nextPlate = 'มาแล้ว';
+            else if (currentPlate === 'มาแล้ว') nextPlate = '-';
+            quickUpdate(id, 'plate', nextPlate);
+        };
+
+        window.alertNotCompleted = function() {
+            Swal.fire('แจ้งเตือน', 'คุณต้องกดงานเสร็จก่อนถึงจะใช้งานได้', 'warning');
+        };
+
         function renderTable(records) {
             const tbody = document.getElementById('tableBody');
             if (records.length === 0) {
@@ -712,20 +730,46 @@
                     ? `<span class="text-green-600 font-bold bg-green-50 px-2.5 py-1 rounded border border-green-200 whitespace-nowrap">✅ ${item.status.operation}</span>`
                     : `<button onclick="openCompleteModal('${item.id}')" class="bg-green-600 hover:bg-green-700 text-white px-2.5 py-1 rounded text-xs font-semibold whitespace-nowrap">✅ งานเสร็จ</button>`;
 
-                let plateTag = item.status?.plate === 'มาแล้ว' ? `<span class="text-green-700 bg-green-100 px-2 py-1 rounded whitespace-nowrap">มาแล้ว</span>` : (item.status?.plate === 'รอผลิต' ? `<span class="text-yellow-700 bg-yellow-100 px-2 py-1 rounded whitespace-nowrap">รอผลิต</span>` : `<span class="text-gray-400">-</span>`);
-                
-                let pickupTag = (item.status?.pickup === 'รับแล้ว' || item.status?.pickup === 'รับไปแล้ว') 
-                    ? `<span class="text-purple-700 bg-purple-100 px-2 py-1 rounded whitespace-nowrap">รับแล้ว</span>` 
-                    : `<button onclick="confirmQuickUpdate('${item.id}', 'pickup', 'รับแล้ว', 'ลูกค้ามารับเอกสารแล้ว')" class="bg-yellow-100 hover:bg-yellow-200 text-yellow-700 border border-yellow-300 px-2 py-1 rounded whitespace-nowrap font-medium">ยังไม่มารับ</button>`;
+                // ป้ายทะเบียน (Plate Status)
+                let plateText = item.status?.plate || '-';
+                let plateClass = 'text-gray-400 bg-gray-100';
+                if (plateText === 'มาแล้ว') plateClass = 'text-green-700 bg-green-100 font-medium';
+                else if (plateText === 'รอผลิต') plateClass = 'text-yellow-700 bg-yellow-100 font-medium';
 
-                let accTag = item.status?.accounting === 'ลงบัญชีแล้ว' ? `<span class="text-blue-700 bg-blue-100 px-2 py-1 rounded whitespace-nowrap">ลงบัญชีแล้ว</span>` : `<button onclick="confirmQuickUpdate('${item.id}', 'accounting', 'ลงบัญชีแล้ว', 'ลงบัญชีเรียบร้อย')" class="text-blue-600 border border-blue-200 px-2 py-1 rounded bg-white whitespace-nowrap">ลงบัญชี</button>`;
+                let plateTag = isCompleted
+                    ? `<button onclick="togglePlateStatus('${item.id}', '${plateText}', true)" class="${plateClass} px-2.5 py-1 rounded whitespace-nowrap hover:opacity-80 transition cursor-pointer" title="คลิกเพื่อเปลี่ยนสถานะป้าย">${plateText}</button>`
+                    : `<button onclick="alertNotCompleted()" class="${plateClass} px-2.5 py-1 rounded whitespace-nowrap opacity-70 cursor-not-allowed" title="ต้องกดงานเสร็จก่อน">${plateText}</button>`;
+                
+                // รับเอกสาร (Pickup Status)
+                let pickupTag = '';
+                if (item.status?.pickup === 'รับแล้ว' || item.status?.pickup === 'รับไปแล้ว') {
+                    pickupTag = `<span class="text-purple-700 bg-purple-100 px-2.5 py-1 rounded whitespace-nowrap">รับแล้ว</span>`;
+                } else {
+                    if (isCompleted) {
+                        pickupTag = `<button onclick="confirmQuickUpdate('${item.id}', 'pickup', 'รับแล้ว', 'ลูกค้ามารับเอกสารแล้ว')" class="bg-yellow-100 hover:bg-yellow-200 text-yellow-700 border border-yellow-300 px-2 py-1 rounded whitespace-nowrap font-medium">ยังไม่มารับ</button>`;
+                    } else {
+                        pickupTag = `<button onclick="alertNotCompleted()" class="bg-gray-100 text-gray-500 border border-gray-200 px-2.5 py-1 rounded whitespace-nowrap opacity-75 cursor-not-allowed">ยังไม่มารับ</button>`;
+                    }
+                }
+
+                // ลงบัญชี (Accounting Status)
+                let accTag = '';
+                if (item.status?.accounting === 'ลงบัญชีแล้ว') {
+                    accTag = `<span class="text-blue-700 bg-blue-100 px-2.5 py-1 rounded whitespace-nowrap">ลงบัญชีแล้ว</span>`;
+                } else {
+                    if (isCompleted) {
+                        accTag = `<button onclick="confirmQuickUpdate('${item.id}', 'accounting', 'ลงบัญชีแล้ว', 'ลงบัญชีเรียบร้อย')" class="text-blue-600 border border-blue-200 px-2.5 py-1 rounded bg-white whitespace-nowrap">ลงบัญชี</button>`;
+                    } else {
+                        accTag = `<button onclick="alertNotCompleted()" class="bg-gray-100 text-gray-400 border border-gray-200 px-2.5 py-1 rounded whitespace-nowrap opacity-75 cursor-not-allowed">ลงบัญชี</button>`;
+                    }
+                }
 
                 const phoneInput = item.customer_phone || '';
                 const isPhoneNum = /^[0-9\-]+$/.test(phoneInput);
                 const phoneValue = phoneInput ? (isPhoneNum ? `<a href="tel:${phoneInput}" class="text-green-700 font-semibold inline-flex items-center gap-1 whitespace-nowrap">📞 ${phoneInput}</a>` : `<span class="text-gray-700 font-medium whitespace-nowrap">👤 ${phoneInput}</span>`) : '-';
 
-                const totalColl = Number(item.financial?.total_collected) || 0;
-                const remBal = Number(item.financial?.remaining_balance) || 0;
+                const totalColl = parseFloat(String(item.financial?.total_collected || '0').replace(/,/g, '')) || 0;
+                const remBal = parseFloat(String(item.financial?.remaining_balance || '0').replace(/,/g, '')) || 0;
 
                 html += `
                     <tr class="hover:bg-blue-50/50 transition border-b border-gray-100">
@@ -896,10 +940,10 @@
                 new_plate: document.getElementById('new_plate').value,
                 new_province: document.getElementById('new_province').value,
                 financial: {
-                    total_collected: parseFloat(document.getElementById('total_collected').value) || 0,
-                    operation_cost: parseFloat(document.getElementById('operation_cost').value) || 0,
-                    parts_deduction: parseFloat(document.getElementById('parts_deduction').value) || 0,
-                    remaining_balance: parseFloat(document.getElementById('remaining_balance').value) || 0
+                    total_collected: parseFloat(String(document.getElementById('total_collected').value).replace(/,/g, '')) || 0,
+                    operation_cost: parseFloat(String(document.getElementById('operation_cost').value).replace(/,/g, '')) || 0,
+                    parts_deduction: parseFloat(String(document.getElementById('parts_deduction').value).replace(/,/g, '')) || 0,
+                    remaining_balance: parseFloat(String(document.getElementById('remaining_balance').value).replace(/,/g, '')) || 0
                 },
                 customer_phone: document.getElementById('customer_phone').value,
                 completed_date: document.getElementById('completed_date').value,
