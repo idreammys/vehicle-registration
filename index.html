@@ -430,7 +430,7 @@
         });
     </script>
 
-    <!-- Script หลักระบบจัดการข้อมูล (เรียกใช้งาน report.js) -->
+    <!-- Script หลักระบบจัดการข้อมูล -->
     <script type="module">
         import { thaiProvinces } from './provinces.js';
         import { openPrintReportModal } from './report.js';
@@ -754,7 +754,6 @@
             tbody.innerHTML = html;
         }
 
-        // ผูกปุ่มพิมพ์รายงานเรียกใช้งานฟังก์ชันจาก report.js
         document.getElementById('printReportBtn').addEventListener('click', () => {
             openPrintReportModal(allRecords, branchesList, currentUser, currentBranchFilter, document.getElementById('monthFilter'), currentMonth, formatThaiDate, formatMonthTitle);
         });
@@ -973,12 +972,20 @@
 
         window.confirmDelete = function(id, plate) {
             Swal.fire({
-                title: 'ยืนยันการลบ?', text: `ต้องการลบรายการทะเบียน "${plate}" ใช่หรือไม่?`, icon: 'warning',
-                showCancelButton: type = 'true', confirmButtonText: 'ใช่, ลบเลย!', cancelButtonText: 'ยกเลิก'
+                title: 'ยืนยันการลบ?', 
+                text: `ต้องการลบรายการทะเบียน "${plate}" ใช่หรือไม่?`, 
+                icon: 'warning',
+                showCancelButton: true, 
+                confirmButtonText: 'ใช่, ลบเลย!', 
+                cancelButtonText: 'ยกเลิก'
             }).then(async (res) => {
                 if (res.isConfirmed) {
-                    await deleteDoc(doc(db, "vehicle_services", id));
-                    Swal.fire('ลบสำเร็จ!', 'ลบรายการเรียบร้อยแล้ว', 'success');
+                    try {
+                        await deleteDoc(doc(db, "vehicle_services", id));
+                        Swal.fire('ลบสำเร็จ!', 'ลบรายการเรียบร้อยแล้ว', 'success');
+                    } catch (error) {
+                        Swal.fire('ข้อผิดพลาด!', error.message, 'error');
+                    }
                 }
             });
         };
