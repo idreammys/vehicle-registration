@@ -56,11 +56,13 @@ function generateReportWindow(targetMonth, allRecords, branchesList, currentUser
         rowsHtml += `
             <tr>
                 <td style="border: 1px solid #ddd; padding: 6px; text-align: center;">${index + 1}</td>
-                <td style="border: 1px solid #ddd; padding: 6px; white-space: nowrap;">${formatThaiDate(r.completed_date)}</td>
                 ${currentUser.role === 'admin' && currentBranchFilter === 'all' ? `<td style="border: 1px solid #ddd; padding: 6px;">${bName}</td>` : ''}
+                <td style="border: 1px solid #ddd; padding: 6px; white-space: nowrap;">${formatThaiDate(r.receive_date)}</td>
+                <td style="border: 1px solid #ddd; padding: 6px; white-space: nowrap;">${formatThaiDate(r.completed_date)}</td>
                 <td style="border: 1px solid #ddd; padding: 6px; font-weight: bold;">${r.old_plate || '-'} <span style="font-size:11px; font-weight:normal; color:#555;">(${r.old_province || ''})</span></td>
                 <td style="border: 1px solid #ddd; padding: 6px; font-weight: bold; color: #6b21a8;">${r.new_plate ? r.new_plate + ' <span style="font-size:11px; font-weight:normal; color:#555;">(' + (r.new_province || '') + ')</span>' : '-'}</td>
                 <td style="border: 1px solid #ddd; padding: 6px;">${r.car_model || '-'} <br><span style="font-size:11px; color:#2563eb;">(${r.service_type || '-'})</span></td>
+                <td style="border: 1px solid #ddd; padding: 6px; white-space: nowrap;">${r.customer_phone || '-'}</td>
                 <td style="border: 1px solid #ddd; padding: 6px; text-align: right; white-space: nowrap;">฿${(r.financial?.total_collected || 0).toLocaleString()}</td>
                 <td style="border: 1px solid #ddd; padding: 6px; text-align: right; color: #16a34a; font-weight: bold; white-space: nowrap;">฿${(r.financial?.remaining_balance || 0).toLocaleString()}</td>
             </tr>
@@ -80,8 +82,8 @@ function generateReportWindow(targetMonth, allRecords, branchesList, currentUser
                 h2 { margin: 0 0 5px 0; text-align: center; font-size: 20px; }
                 h4 { margin: 0 0 15px 0; text-align: center; font-size: 14px; color: #555; font-weight: normal; }
                 .header-info { margin-bottom: 15px; font-size: 13px; display: flex; justify-content: space-between; border-bottom: 2px solid #ddd; padding-bottom: 8px; }
-                table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; }
-                th { background-color: #f3f4f6; border: 1px solid #ddd; padding: 8px; text-align: left; }
+                table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 11px; }
+                th { background-color: #f3f4f6; border: 1px solid #ddd; padding: 6px; text-align: left; }
                 .summary-box { margin-top: 20px; border: 1px solid #ddd; padding: 15px; border-radius: 8px; background: #f9fafb; display: flex; justify-content: space-around; font-size: 14px; font-weight: bold; }
                 @media print {
                     body { padding: 0; }
@@ -99,12 +101,14 @@ function generateReportWindow(targetMonth, allRecords, branchesList, currentUser
             <table>
                 <thead>
                     <tr>
-                        <th style="width: 40px; text-align: center;">ลำดับ</th>
-                        <th>วันที่เสร็จ</th>
+                        <th style="width: 35px; text-align: center;">ลำดับ</th>
                         ${currentUser.role === 'admin' && currentBranchFilter === 'all' ? `<th>สาขา</th>` : ''}
+                        <th>วันที่รับ</th>
+                        <th>วันที่เสร็จ</th>
                         <th>ทะเบียนเก่า</th>
                         <th>ทะเบียนใหม่</th>
                         <th>รุ่นรถ / บริการ</th>
+                        <th>เบอร์โทร / ผู้ติดต่อ</th>
                         <th style="text-align: right;">ยอดเก็บ (บาท)</th>
                         <th style="text-align: right;">กำไรสุทธิ (บาท)</th>
                     </tr>
