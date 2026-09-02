@@ -654,8 +654,8 @@
                 const isCompleted = data.status?.operation && data.status.operation.includes('เสร็จ');
                 const isCompletedInMonth = isCompleted && (currentMonth === 'all' || (data.completed_date && data.completed_date.startsWith(currentMonth)));
                 if (isCompletedInMonth) {
-                    totalCollected += data.financial?.total_collected || 0;
-                    totalProfit += data.financial?.remaining_balance || 0;
+                    totalCollected += Number(data.financial?.total_collected) || 0;
+                    totalProfit += Number(data.financial?.remaining_balance) || 0;
                 }
                 if (data.status?.plate === 'รอผลิต') pendingPlateCount++;
                 if (data.status?.accounting === 'ยังไม่ลงบัญชี') pendingAccCount++;
@@ -724,6 +724,9 @@
                 const isPhoneNum = /^[0-9\-]+$/.test(phoneInput);
                 const phoneValue = phoneInput ? (isPhoneNum ? `<a href="tel:${phoneInput}" class="text-green-700 font-semibold inline-flex items-center gap-1 whitespace-nowrap">📞 ${phoneInput}</a>` : `<span class="text-gray-700 font-medium whitespace-nowrap">👤 ${phoneInput}</span>`) : '-';
 
+                const totalColl = Number(item.financial?.total_collected) || 0;
+                const remBal = Number(item.financial?.remaining_balance) || 0;
+
                 html += `
                     <tr class="hover:bg-blue-50/50 transition border-b border-gray-100">
                         <td class="p-2.5 font-semibold text-purple-600" style="display: ${currentUser.role === 'admin' ? 'table-cell' : 'none'};">${branchName}</td>
@@ -738,8 +741,8 @@
                             <span class="text-blue-600 text-[11px]">(${item.service_type || '-'})</span>
                         </td>
                         <td class="p-2.5 leading-tight whitespace-nowrap">
-                            <span class="text-gray-700 text-[11px]">เก็บ: ฿${(item.financial?.total_collected || 0).toLocaleString()}</span><br>
-                            <span class="font-bold text-green-600 text-[11px]">กำไร: ฿${(item.financial?.remaining_balance || 0).toLocaleString()}</span>
+                            <span class="text-gray-700 text-[11px]">เก็บ: ฿${totalColl.toLocaleString()}</span><br>
+                            <span class="font-bold text-green-600 text-[11px]">กำไร: ฿${remBal.toLocaleString()}</span>
                         </td>
                         <td class="p-2.5 text-center whitespace-nowrap">${opStatusAction}</td>
                         <td class="p-2.5 text-center whitespace-nowrap">${plateTag}</td>
