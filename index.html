@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ระบบจัดการงาน ตรอ. และทะเบียนรถ (Multi-Branch)</title>
+    <title>ระบบจัดการงานทะเบียนรถ</title>
     
     <script>
         const currentUser = JSON.parse(localStorage.getItem('tr_current_user'));
@@ -172,8 +172,8 @@
 
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                        <label class="block text-xs font-medium text-gray-700 mb-1">เบอร์โทรลูกค้า *</label>
-                        <input type="tel" id="customer_phone" placeholder="081-2345678" maxlength="11" required class="w-full border rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-400">
+                        <label class="block text-xs font-medium text-gray-700 mb-1">เบอร์โทร / ชื่อผู้ติดต่อ *</label>
+                        <input type="text" id="customer_phone" placeholder="081-2345678 หรือ ชื่อผู้ติดต่อ" required class="w-full border rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-400">
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-gray-700 mb-1">วันที่งานเสร็จ</label>
@@ -382,7 +382,7 @@
         </div>
     </div>
 
-    <!-- Script คำนวณเงินและจัดรูปแบบเบอร์โทร -->
+    <!-- Script คำนวณเงินและจัดรูปแบบเบอร์โทร (รองรับทั้งเบอร์และชื่อ) -->
     <script>
         const elTotal = document.getElementById('total_collected');
         const elOp = document.getElementById('operation_cost');
@@ -403,8 +403,15 @@
             });
         });
 
+        // รองรับการพิมพ์ทั้งเบอร์โทร (จัดรูปแบบ 081-2345678) และพิมพ์ชื่อ (เช่น ช่างพอ)
         document.getElementById('customer_phone').addEventListener('input', function (e) {
-            let v = this.value.replace(/\D/g, '').substring(0, 10);
+            let val = this.value;
+            // ถ้ามีการพิมพ์ตัวอักษรภาษาไทยหรืออังกฤษ ให้ปล่อยผ่านพิมพ์ได้อิสระ
+            if (/[ก-๙a-zA-Z]/.test(val)) {
+                return;
+            }
+            // ถ้าเป็นตัวเลข ให้จัดรูปแบบเบอร์โทรอัตโนมัติ
+            let v = val.replace(/\D/g, '').substring(0, 10);
             if (v.length > 3) {
                 v = v.substring(0, 3) + '-' + v.substring(3);
             }
@@ -430,6 +437,14 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, getDocs, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
+        let allRecords = [];
+        let branchesList = [];
+        let usersList = [];
+        const now = new Date();
+        let currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`; 
+        let currentSearch = '';
+        let currentBranchFilter = 'all';
+
         const firebaseConfig = {
             apiKey: "AIzaSyCKcR2kwxB0Mi8KmEQ_wyCpAN7_-AAn02o",
             authDomain: "vehicle-registration-sys-5b320.firebaseapp.com",
@@ -442,14 +457,6 @@
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
-
-        let allRecords = [];
-        let branchesList = [];
-        let usersList = [];
-        const now = new Date();
-        let currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`; 
-        let currentSearch = '';
-        let currentBranchFilter = 'all';
 
         function loadProvincesDropdown() {
             const selects = document.querySelectorAll('.province-select');
@@ -609,7 +616,6 @@
         function applyFilters() {
             let filtered = allRecords;
 
-            // กรองตามสิทธิ์สาขา
             if (currentUser.role === 'staff') {
                 filtered = filtered.filter(r => r.branch_id === currentUser.branch_id);
             } else if (currentUser.role === 'admin') {
@@ -618,7 +624,6 @@
                 }
             }
 
-            // กรองตามเดือน: งานที่กำลังดำเนินการจะแสดงผลตลอดเวลา, งานที่เสร็จแล้วจะกรองตามเดือนที่เสร็จ
             if (currentMonth !== 'all') {
                 filtered = filtered.filter(r => 
                     (r.status?.operation !== 'เสร็จแล้ว') || 
@@ -703,7 +708,10 @@
                 let pickupTag = item.status?.pickup === 'รับไปแล้ว' ? `<span class="text-purple-700 bg-purple-100 px-2 py-1 rounded whitespace-nowrap">รับไปแล้ว</span>` : `<button onclick="confirmQuickUpdate('${item.id}', 'pickup', 'รับไปแล้ว', 'ลูกค้ามารับเอกสารแล้ว')" class="text-purple-600 border border-purple-200 px-2 py-1 rounded bg-white whitespace-nowrap">กดรับแล้ว</button>`;
                 let accTag = item.status?.accounting === 'ลงบัญชีแล้ว' ? `<span class="text-blue-700 bg-blue-100 px-2 py-1 rounded whitespace-nowrap">ลงบัญชีแล้ว</span>` : `<button onclick="confirmQuickUpdate('${item.id}', 'accounting', 'ลงบัญชีแล้ว', 'ลงบัญชีเรียบร้อย')" class="text-blue-600 border border-blue-200 px-2 py-1 rounded bg-white whitespace-nowrap">ลงบัญชี</button>`;
 
-                const phoneValue = item.customer_phone ? `<a href="tel:${item.customer_phone}" class="text-green-700 font-semibold inline-flex items-center gap-1 whitespace-nowrap">📞 ${item.customer_phone}</a>` : '-';
+                // ตรวจสอบว่าเบอร์โทรเป็นตัวเลขหรือชื่อ ถ้าเป็นเบอร์ให้ทำลิงก์โทรออก ถ้าเป็นชื่อให้แสดงผลปกติ
+                const phoneInput = item.customer_phone || '';
+                const isPhoneNum = /^[0-9\-]+$/.test(phoneInput);
+                const phoneValue = phoneInput ? (isPhoneNum ? `<a href="tel:${phoneInput}" class="text-green-700 font-semibold inline-flex items-center gap-1 whitespace-nowrap">📞 ${phoneInput}</a>` : `<span class="text-gray-700 font-medium whitespace-nowrap">👤 ${phoneInput}</span>`) : '-';
 
                 html += `
                     <tr class="hover:bg-blue-50/50 transition border-b border-gray-100">
