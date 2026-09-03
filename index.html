@@ -62,7 +62,7 @@
         </header>
 
         <!-- Dashboard สรุปยอด -->
-        <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
             <div class="bg-gradient-to-br from-white to-blue-50/50 p-4 rounded-2xl shadow-sm border border-blue-100 flex items-center justify-between">
                 <div>
                     <p class="text-xs text-gray-500 font-semibold uppercase tracking-wider">เงินเก็บรวม (เดือนที่เสร็จ)</p>
@@ -77,6 +77,16 @@
                 </div>
                 <div class="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center text-green-600 text-lg font-bold shadow-inner">📈</div>
             </div>
+            
+            <!-- เพิ่มการ์ดกำไรวันนี้ -->
+            <div class="bg-gradient-to-br from-white to-purple-50/50 p-4 rounded-2xl shadow-sm border border-purple-100 flex items-center justify-between">
+                <div>
+                    <p class="text-xs text-gray-500 font-semibold uppercase tracking-wider">กำไรวันนี้</p>
+                    <h3 id="sumTodayProfit" class="text-xl md:text-2xl font-bold text-purple-600 mt-1">฿0</h3>
+                </div>
+                <div class="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center text-purple-600 text-lg font-bold shadow-inner">🔥</div>
+            </div>
+
             <div class="bg-gradient-to-br from-white to-amber-50/50 p-4 rounded-2xl shadow-sm border border-amber-100 flex items-center justify-between">
                 <div>
                     <p class="text-xs text-gray-500 font-semibold uppercase tracking-wider">ป้ายทะเบียนรอผลิต</p>
@@ -633,7 +643,6 @@
         };
 
         function listenToData() {
-            // ไม่ต้องใช้ orderBy จาก Firebase เพื่อป้องกันปัญหา Index แล้วค่อยมา Sort ใน JavaScript
             const q = query(collection(db, "vehicle_services"));
             onSnapshot(q, (snapshot) => {
                 allRecords = [];
@@ -718,6 +727,29 @@
 
         function updateDashboard(records) {
             let totalCollected = 0, totalProfit = 0, pendingPlateCount = 0, pendingAccCount = 0;
+            let todayProfit = 0; // กำไรวันนี้
+            
+            const todayObj = new Date();
+            const todayString = `${todayObj.getFullYear()}-${String(todayObj.getMonth() + 1).padStart(2, '0')}-${String(todayObj.getDate()).padStart(2, '0')}`;
+
+            // คำนวณกำไรวันนี้จาก allRecords (เพื่อไม่ให้ถูกตัวกรองเดือน/ค้นหาตัดข้อมูลทิ้ง) แต่กรองตามสาขา
+            allRecords.forEach(data => {
+                let matchBranch = false;
+                if (currentUser.role === 'staff') {
+                    matchBranch = data.branch_id === currentUser.branch_id;
+                } else if (currentUser.role === 'admin') {
+                    matchBranch = currentBranchFilter === 'all' || data.branch_id === currentBranchFilter;
+                }
+
+                if (matchBranch) {
+                    const isCompleted = data.status?.operation && data.status.operation.includes('เสร็จ');
+                    if (isCompleted && data.completed_date === todayString) {
+                        let remVal = String(data.financial?.remaining_balance || '0').replace(/,/g, '');
+                        todayProfit += parseFloat(remVal) || 0;
+                    }
+                }
+            });
+
             records.forEach(data => {
                 const isCompleted = data.status?.operation && data.status.operation.includes('เสร็จ');
                 const isCompletedInMonth = isCompleted && (currentMonth === 'all' || (data.completed_date && data.completed_date.startsWith(currentMonth)));
@@ -732,6 +764,7 @@
             });
             document.getElementById('sumTotal').innerText = `฿${totalCollected.toLocaleString()}`;
             document.getElementById('sumProfit').innerText = `฿${totalProfit.toLocaleString()}`;
+            document.getElementById('sumTodayProfit').innerText = `฿${todayProfit.toLocaleString()}`;
             document.getElementById('sumPendingPlate').innerText = `${pendingPlateCount} รายการ`;
             document.getElementById('sumPendingAcc').innerText = `${pendingAccCount} รายการ`;
         }
@@ -1018,7 +1051,7 @@
                     pickup: document.getElementById('pickup_status').value,
                     accounting: document.getElementById('accounting_status').value
                 },
-                updated_at: new Date() // สำคัญสำหรับการเรียงลำดับใหม่สุด
+                updated_at: new Date()
             };
 
             try {
