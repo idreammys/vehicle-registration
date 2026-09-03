@@ -78,7 +78,6 @@
                 <div class="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center text-green-600 text-lg font-bold shadow-inner">📈</div>
             </div>
             
-            <!-- เพิ่มการ์ดกำไรวันนี้ -->
             <div class="bg-gradient-to-br from-white to-purple-50/50 p-4 rounded-2xl shadow-sm border border-purple-100 flex items-center justify-between">
                 <div>
                     <p class="text-xs text-gray-500 font-semibold uppercase tracking-wider">กำไรวันนี้</p>
@@ -498,6 +497,16 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, getDocs, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
+        // --- เพิ่มรายการแปลงชื่อจังหวัดเป็นตัวย่อ ---
+        const provinceAbbrMap = {
+            "กรุงเทพมหานคร": "กทม", "สมุทรปราการ": "สป", "นนทบุรี": "นบ", "ปทุมธานี": "ปท", "พระนครศรีอยุธยา": "อย", "อ่างทอง": "อท", "ลพบุรี": "ลบ", "สิงห์บุรี": "สห", "ชัยนาท": "ชน", "สระบุรี": "สบ",
+            "ชลบุรี": "ชบ", "ระยอง": "รย", "จันทบุรี": "จบ", "ตราด": "ตร", "ฉะเชิงเทรา": "ฉช", "ปราจีนบุรี": "ปจ", "นครนายก": "นย", "สระแก้ว": "สก",
+            "นครราชสีมา": "นม", "บุรีรัมย์": "บร", "สุรินทร์": "สร", "ศรีสะเกษ": "ศก", "อุบลราชธานี": "อบ", "ยโสธร": "ยส", "ชัยภูมิ": "ชย", "อำนาจเจริญ": "อจ", "บึงกาฬ": "บก", "หนองบัวลำภู": "นภ", "ขอนแก่น": "ขก", "อุดรธานี": "อด", "เลย": "ลย", "หนองคาย": "นค", "มหาสารคาม": "มค", "ร้อยเอ็ด": "รอ", "กาฬสินธุ์": "กส", "สกลนคร": "สน", "นครพนม": "นพ", "มุกดาหาร": "มห",
+            "เชียงใหม่": "ชม", "ลำพูน": "ลพ", "ลำปาง": "ลป", "อุตรดิตถ์": "อต", "แพร่": "พร", "น่าน": "นน", "พะเยา": "พย", "เชียงราย": "ชร", "แม่ฮ่องสอน": "มส", "นครสวรรค์": "นว", "อุทัยธานี": "อน", "กำแพงเพชร": "กพ", "ตาก": "ตก", "สุโขทัย": "สท", "พิษณุโลก": "พล", "พิจิตร": "พจ", "เพชรบูรณ์": "พช",
+            "ราชบุรี": "รบ", "กาญจนบุรี": "กจ", "สุพรรณบุรี": "สพ", "นครปฐม": "นฐ", "สมุทรสาคร": "สค", "สมุทรสงคราม": "สส", "เพชรบุรี": "พบ", "ประจวบคีรีขันธ์": "ปข",
+            "นครศรีธรรมราช": "นศ", "กระบี่": "กบ", "พังงา": "พง", "ภูเก็ต": "ภก", "สุราษฎร์ธานี": "สฎ", "ระนอง": "รน", "ชุมพร": "ชพ", "สงขลา": "สข", "สตูล": "สต", "ตรัง": "ตง", "พัทลุง": "พท", "ปัตตานี": "ปน", "ยะลา": "ยล", "นราธิวาส": "นธ"
+        };
+
         let allRecords = [];
         let branchesList = [];
         let usersList = [];
@@ -701,7 +710,6 @@
                 );
             }
 
-            // จัดเรียงข้อมูล: ให้ข้อมูลที่ "บันทึกล่าสุด" อยู่บนสุดเสมอ
             filtered.sort((a, b) => {
                 let timeA = 0;
                 let timeB = 0;
@@ -714,7 +722,7 @@
                 else if (b.updated_at) timeB = b.updated_at.seconds ? b.updated_at.seconds * 1000 : new Date(b.updated_at).getTime();
                 else if (b.receive_date) timeB = new Date(b.receive_date).getTime();
 
-                return timeB - timeA; // มากไปน้อย (ล่าสุดอยู่บน)
+                return timeB - timeA;
             });
 
             updateDashboard(filtered); 
@@ -727,12 +735,11 @@
 
         function updateDashboard(records) {
             let totalCollected = 0, totalProfit = 0, pendingPlateCount = 0, pendingAccCount = 0;
-            let todayProfit = 0; // กำไรวันนี้
+            let todayProfit = 0;
             
             const todayObj = new Date();
             const todayString = `${todayObj.getFullYear()}-${String(todayObj.getMonth() + 1).padStart(2, '0')}-${String(todayObj.getDate()).padStart(2, '0')}`;
 
-            // คำนวณกำไรวันนี้จาก allRecords (เพื่อไม่ให้ถูกตัวกรองเดือน/ค้นหาตัดข้อมูลทิ้ง) แต่กรองตามสาขา
             allRecords.forEach(data => {
                 let matchBranch = false;
                 if (currentUser.role === 'staff') {
@@ -806,6 +813,24 @@
 
         window.alertNotCompleted = function() {
             Swal.fire('แจ้งเตือน', 'คุณต้องกดงานเสร็จก่อนถึงจะใช้งานได้', 'warning');
+        };
+
+        // ฟังก์ชันสำหรับการ Copy ข้อมูลไปวางใน Excel
+        window.copyToExcel = function(plate, province, service) {
+            const abbr = provinceAbbrMap[province] || province || '-';
+            const textToCopy = `${plate || '-'}\t${abbr}\t${service || '-'}`;
+            
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                Swal.fire({
+                    title: 'คัดลอกสำเร็จ!',
+                    text: `คัดลอก: ${plate || '-'} | ${abbr} | ${service || '-'}`,
+                    icon: 'success',
+                    timer: 1500,
+                    showConfirmButton: false
+                });
+            }).catch(err => {
+                Swal.fire('ข้อผิดพลาด', 'ไม่สามารถคัดลอกได้', 'error');
+            });
         };
 
         function renderTable(records) {
@@ -892,6 +917,8 @@
                         <td class="p-2.5 text-center whitespace-nowrap">${accTag}</td>
                         <td class="p-2.5 text-center whitespace-nowrap">${phoneValue}</td>
                         <td class="p-2.5 text-center whitespace-nowrap space-x-1">
+                            <!-- เพิ่มปุ่ม Copy ข้อมูลลง Excel -->
+                            <button onclick="copyToExcel('${item.old_plate || ''}', '${item.old_province || ''}', '${item.service_type || ''}')" class="bg-indigo-500 hover:bg-indigo-600 text-white px-2 py-1 rounded text-[11px] font-medium" title="คัดลอกลง Excel">Copy</button>
                             <button onclick="editRecord('${item.id}')" class="bg-amber-500 hover:bg-amber-600 text-white px-2 py-1 rounded text-[11px] font-medium">แก้ไข</button>
                             <button onclick="confirmDelete('${item.id}', '${item.old_plate}')" class="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-[11px] font-medium">ลบ</button>
                         </td>
